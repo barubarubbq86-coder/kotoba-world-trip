@@ -1,0 +1,10 @@
+name = "kotoba-trip-proxy"
+main = "index.js"
+compatibility_date = "2026-10-06"
+
+[ observability.logs ]
+enabled = false
+
+[vars]
+# Set this to the exact GitHub Pages origin, for example https://USERNAME.github.io
+ALLOWED_ORIGIN = "https://YOUR_USERNAME.github.io"
