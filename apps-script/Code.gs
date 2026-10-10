@@ -38,7 +38,7 @@ function reserve_(units,start) {
     let budget=JSON.parse(p.getProperty('BUDGET')||'null')||{minute:now,day:now,requests:0,calls:0,starts:0};
     if(now-budget.minute>=60000){budget.minute=now;budget.requests=0;budget.starts=0;}
     if(now-budget.day>=86400000){budget.day=now;budget.calls=0;}
-    if(budget.requests>=80||budget.calls+units>1000||(start&&budget.starts>=6))throw new Error('limited');
+    if(budget.requests>=80||budget.calls+units>6000||(start&&budget.starts>=6))throw new Error('limited');
     budget.requests++;budget.calls+=units;if(start)budget.starts++;
     p.setProperty('BUDGET',JSON.stringify(budget));
   } finally { lock.releaseLock(); }
