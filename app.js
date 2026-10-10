@@ -1,10 +1,48 @@
-const LANGUAGES=[['ウェールズ語','cy'],['アルバニア語','sq'],['ジョージア語','ka'],['グジャラート語','gu'],['ベンガル語','bn'],['タミル語','ta'],['テルグ語','te'],['スワヒリ語','sw'],['ハイチ語','ht'],['エストニア語','et'],['ネパール語','ne'],['アフリカーンス語','af'],['インドネシア語','id'],['クメール語','km'],['ラオ語','lo'],['ラトビア語','lv'],['マラヤーラム語','ml'],['マラーティー語','mr']];
-const API_BASE=(location.hostname==='localhost'||location.hostname==='127.0.0.1')?'http://127.0.0.1:8787':'https://SET_YOUR_WORKER_URL';
-const $=s=>document.querySelector(s);const source=$('#source'),go=$('#go'),status=$('#status'),resultCard=$('#resultCard');let busy=false;
+const $=s=>document.querySelector(s);
+const source=$('#source'),go=$('#go'),status=$('#status');
+let busy=false, previousRoute=[], activeController;
+const BACKEND_URL=window.BACKEND_URL||'';
+function syncOffline(){ $('#offline').hidden=navigator.onLine!==false; }
+syncOffline();
 source.addEventListener('input',()=>$('#count').textContent=source.value.length);
-function routeFor(n){const pool=[...LANGUAGES];for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]]}return pool.slice(0,n)}
-async function translate(text,target){let last;for(let attempt=0;attempt<2;attempt++){try{const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),18000);const res=await fetch(`${API_BASE}/translate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,target}),signal:controller.signal});clearTimeout(timer);if(!res.ok)throw Error('translation');const data=await res.json();if(typeof data.text!=='string'||!data.text.trim())throw Error('translation');return data.text}catch(e){last=e;if(!navigator.onLine)throw Error('offline')}}throw last||Error('translation')}
-async function play(){if(busy)return;const original=source.value.trim();if(!original){status.textContent='日本語を書いてから押してね。';source.focus();return}if(!navigator.onLine){status.textContent='インターネットにつながったら遊べるよ。';return}busy=true;go.disabled=true;$('#again').disabled=true;status.textContent='ことばが世界を旅行中！';resultCard.hidden=false;$('#result').textContent='旅に出発！';const langs=routeFor(Number($('#level').value));const journey=[];let text=original;try{for(let i=0;i<langs.length;i++){status.textContent=`ことばが世界を旅行中！ ${i+1} / ${langs.length}`+(i>=langs.length-2?'　もうすぐ日本へ帰ります！':'');text=await translate(text,langs[i][1]);journey.push({name:langs[i][0],text});$('#result').textContent=text;$('#route').textContent='日本語 → '+journey.map(x=>x.name).join(' → ')+' → 日本語';$('#steps').innerHTML=journey.map(x=>`<li><strong>${escapeHtml(x.name)}</strong><br>${escapeHtml(x.text)}</li>`).join('')}text=await translate(text,'ja');$('#result').textContent=text;$('#route').textContent='日本語 → '+journey.map(x=>x.name).join(' → ')+' → 日本語';status.textContent='日本に帰ってきたよ！'}catch(e){status.textContent=e.message==='offline'?'インターネットにつながったら遊べるよ。':'うまく翻訳できなかったよ。もう一回やってみよう！';if(journey.length){$('#result').textContent='あと少しだったのに…';$('#route').textContent='日本語 → '+journey.map(x=>x.name).join(' → ')}}finally{busy=false;go.disabled=false;$('#again').disabled=false}}
-function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-go.addEventListener('click',play);$('#again').addEventListener('click',play);window.addEventListener('offline',()=>{$('#offline').hidden=false});window.addEventListener('online',()=>{$('#offline').hidden=true});
-if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+window.addEventListener('offline',()=>{syncOffline();activeController?.abort()});
+window.addEventListener('online',()=>{syncOffline();if(!busy)status.textContent=''});
+function addStep(name,text){const li=document.createElement('li'),b=document.createElement('strong');b.textContent=name;li.append(b,document.createElement('br'),document.createTextNode(text));$('#steps').append(li)}
+async function play(){
+ if(busy)return;
+ const original=source.value.trim(),level=Number($('#level').value);
+ if(!original||source.value.length>500){status.textContent='日本語を500文字以内で書いてね。';return}
+ if(navigator.onLine===false){syncOffline();status.textContent='インターネットにつながったら遊べるよ';return}
+ if(!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(BACKEND_URL)){status.textContent='いま翻訳がうまくできないみたい。おとなの人に接続の設定をお願いしてね。';return}
+ busy=true;go.disabled=$('#again').disabled=true;source.disabled=$('#level').disabled=true;
+ $('#resultCard').hidden=false;$('#result').textContent='';$('#route').textContent='';$('#steps').replaceChildren();$('details').open=false;addStep('日本語',original);
+ status.textContent='ことばが世界を旅行中！ 1 / '+level;
+ activeController=new AbortController();let timer;
+ const names=['日本語'];
+ async function post(body){
+  timer=setTimeout(()=>activeController.abort(),45000);
+  try {
+   const res=await fetch(BACKEND_URL,{method:'POST',mode:'cors',credentials:'omit',redirect:'follow',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify(body),signal:activeController.signal,referrerPolicy:'no-referrer'});
+   if(!res.ok)throw Error('translation');const data=await res.json();if(data.ok!==true)throw Error('translation');return data;
+  }finally{clearTimeout(timer)}
+ }
+ try{
+  // 本文を送る前に、同じPOST経路で応答を読み取れるか確認。
+  const health=await post({action:'probe'});if(!health.ready)throw Error('setup');
+  const trip=await post({action:'start',text:original,level,previousRoute});
+  if(!Array.isArray(trip.route)||trip.route.length!==level||typeof trip.token!=='string')throw Error('translation');
+  previousRoute=trip.route.map(x=>x.code);let token=trip.token;
+  for(let i=0;i<=level;i++){
+   status.textContent=i===level?'日本へ帰っています…':`ことばが世界を旅行中！ ${i+1} / ${level}　${trip.route[i].name}へ旅行中！`;
+   const step=await post({action:'step',token});
+   const expected=i===level?'ja':trip.route[i].code;
+   if(step.index!==i+1||step.code!==expected||typeof step.text!=='string'||!step.text.trim()||step.done!==(i===level))throw Error('translation');
+   addStep(step.name,step.text);names.push(step.name);$('#route').textContent=names.join(' → ');
+   if(step.done){$('#result').textContent=step.text;status.textContent='日本に帰ってきたよ！'}
+   else {if(typeof step.token!=='string')throw Error('translation');token=step.token;}
+  }
+ }catch{activeController.abort();$('#result').textContent='ことばが迷子になっちゃった！\nもう一回やってみよう！';status.textContent=navigator.onLine===false?'インターネットにつながったら遊べるよ':'いま翻訳がうまくできないみたい。もう一回やってみてね';}
+ finally{clearTimeout(timer);activeController=null;busy=false;go.disabled=$('#again').disabled=source.disabled=$('#level').disabled=false;syncOffline()}
+}
+go.addEventListener('click',play);$('#again').addEventListener('click',play);
+if('serviceWorker'in navigator)window.addEventListener('load',async()=>{try{const r=await navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'});await r.update()}catch{}});

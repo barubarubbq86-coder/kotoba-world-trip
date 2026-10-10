@@ -1,43 +1,103 @@
-# ことばの世界旅行（逆翻訳ゲーム Phase 0.5）
+# ことばの世界旅行｜Phase 0.7 Apps Script版
 
-日本語を選んだ数だけの外国語へ順番に翻訳し、日本語へ戻す小さなスマートフォン向けゲームです。入力文は画面内の一時状態として扱い、ブラウザ保存や独自ログ送信はしません。
+Phase 0.6のUI・PWAを維持して、バックエンドをLanguageAppへ変更した接続候補です。Cloudflare・Cloud Translation APIキーは使いません。**まだ公開Apps Scriptがないため実翻訳・実ブラウザCORS・Android実機の確認は未実施です。Phase 0.7完成とは判定していません。**
 
-## 使うもの
+## はじめに用意するもの
 
-- フロントエンド: HTML / CSS / JavaScript（GitHub Pages）
-- 翻訳: Google Cloud Translation Basic v2
-- APIキー保護: Cloudflare WorkerプロキシのSecret
-- 対応言語: ウェールズ語 (cy)、アルバニア語 (sq)、ジョージア語 (ka)、グジャラート語 (gu)、ベンガル語 (bn)、タミル語 (ta)、テルグ語 (te)、スワヒリ語 (sw)、ハイチ語 (ht)、エストニア語 (et)、ネパール語 (ne)、アフリカーンス語 (af)、インドネシア語 (id)、クメール語 (km)、ラオ語 (lo)、ラトビア語 (lv)、マラヤーラム語 (ml)、マラーティー語 (mr)。途中に英語・日本語は選びません。
+- 保護者のGoogleアカウント
+- このZIPを展開したフォルダ
+- ゲームを置いているGitHubリポジトリ
 
-コードはGoogle公式のCloud Translation言語サポート表で確認したNMT対応コードを使用しています。対応状況は更新されることがあるため、運用前に公式表を再確認してください。
+以前作成したCloud Translation APIキーは、この版に入力しません。
 
-## 起動と公開
+## Apps Scriptを作る（最初の1回）
 
-1. `worker/wrangler.toml` の `ALLOWED_ORIGIN` をGitHub Pagesのオリジンへ変更します。ユーザー名が `example` の場合、通常は `https://example.github.io` です。リポジトリ名までを含めません。
-2. Google Cloudでプロジェクトを作成し、課金とCloud Translation APIを有効にします。APIキーはTranslation APIのみに制限し、利用上限・予算アラートも設定してください。
-3. Cloudflareへログインし、`worker` で `npx wrangler deploy` を実行します。
-4. WorkerのSecretとしてGoogle APIキーを登録します: `npx wrangler secret put GOOGLE_TRANSLATE_KEY`。入力値はプロンプトへ貼り付けます。`wrangler.toml`、JavaScript、GitHubへ書かないでください。
-5. `app.js` の `API_BASE` をデプロイされたWorkerのURL（例 `https://kotoba-trip-proxy.<account>.workers.dev`）に置き換えます。`https://SET_YOUR_WORKER_URL` のままでは本番翻訳できません。
-6. このフォルダの内容をGitHubリポジトリのルートへ置き、Settings → Pagesから公開します。
-7. Android Chromeで公開URLを開き、必要ならブラウザメニューから「ホーム画面に追加」します。
+1. 保護者のPCブラウザで https://script.google.com/ を開き、保護者のGoogleアカウントへログインします。
+2. 左上の「新しいプロジェクト」をクリックします。
+3. 左上の「無題のプロジェクト」をクリックし、「ことばの世界旅行」と入力して名前を付けます。
+4. 左のファイル一覧で「コード.gs」（Code.gsと表示される場合もあります）をクリックします。
+5. 初めから入っている `function myFunction() { ... }` を全部消します。
+6. ZIPの `apps-script/Code.gs` をメモ帳などで開き、全文をコピーします。Apps Scriptの編集欄へ貼り付けます。
+7. 上部の保存アイコンをクリック、またはCtrl+Sで保存します。
+8. 上部の関数選択欄（最初はdoGet等の名前が表示されます）をクリックし、`setupLanguages` を選びます。
+9. 「実行」をクリックします。初回に権限確認が出たら「権限を確認」→自分のGoogleアカウントを選びます。自分で作ったこのプロジェクトであることを確認して承認します。
+10. 「このアプリはGoogleで確認されていません」と出る場合は、プロジェクト名と自分のアカウントを確認してください。自分で作成したこのプロジェクトと確認できる場合だけ「詳細」→そのプロジェクトへ進む→「許可」を選びます。知らないアプリなら進めません。学校・会社のアカウントで管理者に禁止されている場合は回避せず、家庭用アカウントで作成します。
+11. 「実行ログ」に表示された `ready:true` を確認します。18候補を日本語から翻訳して戻し、成功したコードだけを登録しています。`ready:false` なら12言語未満です。時間を置いて `setupLanguages` を再実行し、それでも同じならログのコード一覧だけを共有してください。入力文や鍵は共有不要です。
 
-WorkerにはGitHub Pagesの正確なOriginのみ許可させます。ただしOrigin検査だけでサーバー間の不正利用を完全には防げません。Google APIキーのAPI制限とGoogle Cloudの割当・予算アラートを併用してください。キー制限でHTTPリファラーを必須にしないでください（呼び出し元はWorkerです）。
+この設定処理は定型の短文だけを使います。確認結果のコード以外に翻訳本文は保存しません。
 
-## ローカル確認
+## ウェブアプリとして公開する
 
-Workerの開発用キーを `worker/.dev.vars` に保存し（Gitへ追加しない）、次を実行します。
+12. 右上の「デプロイ」をクリックします。
+13. 「新しいデプロイ」をクリックします。
+14. 「種類の選択」の歯車アイコンをクリックし、「ウェブアプリ」を選びます。
+15. 「説明」に「Phase 0.7」と入力します。
+16. 「次のユーザーとして実行」は **自分** を選びます。保護者のアカウントで翻訳が実行されます。
+17. 「アクセスできるユーザー」は **全員** を選びます。「Googleアカウントを持つ全員」とは異なります。匿名アクセスできないと、GitHub Pagesからログインなしで応答を受け取れません。
+18. 「デプロイ」をクリックします。権限確認が出た場合は、上記と同様に自分で作ったプロジェクトを確認して承認します。
+19. 「ウェブアプリ」のURL欄の「コピー」をクリックします。**末尾が `/exec` のURL**です。`/dev` や編集画面のURLではありません。
+20. 新しいブラウザタブへ貼り付けて開き、`{"ok":true,"version":"0.7","ready":true}` のような表示を確認します。本文はURLに追加しません。この確認はGETのヘルスチェックだけであり、PagesからのPOST成功の証明ではありません。
 
-```sh
-cd worker
-npx wrangler dev
+「全員」が選べない場合は、この構成では接続できません。ログイン回避やCORS回避は行いません。
+
+## GitHub側の設定（URL変更は1か所だけ）
+
+21. ZIPの `config.js` をメモ帳等で開きます。
+22. 次の空の引用符の中へ、コピーしたURLを貼ります。
+
+```js
+window.BACKEND_URL = "https://script.google.com/macros/s/ここにデプロイID/exec";
 ```
 
-開発時は `app.js` が `http://127.0.0.1:8787` を使います。フロントエンドは別途ローカルHTTPサーバーで開きます。`ALLOWED_ORIGIN` はそのフロントエンドのOriginと一致させてください。
+23. 上書き保存します。他のソースを書き換える必要はありません。APIキーは書きません。
+24. GitHubで現在のゲームのリポジトリを開きます。
+25. 「Add file」→「Upload files」をクリックします。
+26. 下記7ファイルを、現在のindex.htmlがある階層へドラッグします。ZIP自体やフォルダ丸ごとをアップロードするのではありません。
 
-## データ・安全性
+- index.html
+- app.js
+- config.js（URLを記入したもの）
+- style.css
+- sw.js
+- manifest.webmanifest
+- icon.svg
 
-- 広告、アカウント、共有、チャット、ランキング、履歴保存はありません。
-- フロントエンドは入力文や翻訳結果をLocal Storage等に保存しません。
-- Workerは本文を永続保存せず、アプリ側でも全文ログを出しません。翻訳処理のため文章はGoogle Cloud Translationへ送信されます。
-- Workerのオリジン制限は一般的なブラウザからの呼び出しを制限します。Google CloudのAPIキー制限・利用割当を必ず併用します。
-- PWAのService Workerはアプリ本体ファイルのみキャッシュし、翻訳API通信はキャッシュしません。オフライン翻訳には対応しません。
+27. 「Commit changes」をクリックします。既にPages設定済みなら、その公開が終わるまで待ちます。
+28. PagesのURLをPCまたはAndroid Chromeで開きます。既存PWAは一度閉じ、再度開いて再読み込みします。
+29. 「こんにちは」を入力して「ちょい壊れ」で実行します。進捗→最終日本語→今回の言葉の旅→途中結果まで確認します。
+30. 桃太郎文章で3/5/8/12言語を確認し、同じ文章で「もう一回」を3回押します。
+
+## エラーが出たら
+
+公開Web App URLとGitHub Pages URLを共有してください。APIキーは不要です。
+
+- URLを直接開けない：デプロイと「全員」設定を見直します。
+- `ready:false`：エディタでsetupLanguagesを実行します。
+- URLは開けるがゲームが失敗：POSTのリダイレクト/CORS、Google側の割当、古い配信ファイル等の確認が必要です。直接URLが開けてもCORSは別問題です。
+- `no-cors` へ変更しないでください。応答を読み取れず、ゲームを完成させられません。JSONPやGETへの本文移動も使いません。
+- 翻訳サービスをCloud Translationへ変更するだけでは、GitHub Pages→Apps Script間のCORS問題は解消しません。失敗を確認した時点で通信構成を再検討します。
+
+## 動作・安全性
+
+入力上限500文字、レベル3/5/8/12、英語除外、最後だけ日本語。ルートはサーバーで決定し、1段階ずつLanguageApp.translateを実行します。サーバー署名付きの続行情報に前段の結果を含め、次段へ使用します。続行情報はPOST bodyだけに送り、サーバーへ永続保存しません。署名は改ざん防止で、暗号化ではありません（通信はHTTPS）。
+
+初回に本文なしのPOST probeで応答が読み取れるか確認します。各POSTはtext/plain、資格情報なし、リダイレクト追従。応答を読めなければ翻訳を続けません。ブラウザの応答待ち45秒で中断し、失敗画面へ戻ります。LanguageAppには個別のサーバー側タイムアウト指定がないため、ブラウザ中断後もその1段階がApps Script側で実行中の場合があります。クライアントから自動再送はせず、サーバーで最大2回だけ試します。
+
+Script Propertiesには確認済み言語コード・確認日時・自動生成の署名秘密・利用回数カウンターだけを保存します。署名秘密はブラウザへ送りません。ユーザーの文・途中結果・完成文のログ出力、DB/Spreadsheet/CacheServiceへの保存は行いません。Googleへ文章を送信する翻訳なので、個人情報は入力しません。Googleのサービス内部での取り扱いまで独自アプリで保証するものではありません。
+
+家庭用の共有制限：開始6回/分、POST80回/分、翻訳呼び出し予約1000回/24時間（1段階で再試行分2回を予約）。Script Lockで並行更新を制御します。IPやユーザーを識別しないため、全利用者で共有です。署名付き情報の再利用も制限の対象ですが、完全な悪用防止やサービス実行回数の保証ではありません。Apps Script自身の割当超過で一時停止することがあります。広告・SNS・交流・権限取得機能はありません。
+
+## 更新・開発用テスト
+
+Code.gs変更時は「保存」後、「デプロイ」→「デプロイを管理」→鉛筆アイコン→「バージョン」で「新バージョン」→「デプロイ」。既存URLを維持できます。保存だけでは公開版へ反映されません。
+
+SWはkotoba-phase07へ更新し、古いkotobaキャッシュを削除。アプリ資産をnetwork-firstで取得し、翻訳通信はキャッシュしません。
+
+- 自動テスト：`node tests/apps-script.mjs`（模擬LanguageApp、実翻訳の証明ではない）。
+- 任意の実翻訳テスト：Apps Scriptの関数選択で `verifyGame` →「実行」。固定桃太郎文で3/5/8/12＋5言語3回を翻訳します。ログは成否・ルート・原文から変化したかのみ。実行に数分かかることがあります。これはサーバーの確認で、実ブラウザの確認は別途必要です。
+
+公式仕様：
+https://developers.google.com/apps-script/reference/language/language-app
+https://developers.google.com/apps-script/guides/web
+https://developers.google.com/apps-script/reference/content/text-output
+https://developers.google.com/apps-script/guides/services/quotas

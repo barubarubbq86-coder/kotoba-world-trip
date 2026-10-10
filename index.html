@@ -5,9 +5,9 @@
 </head>
 <body><main class="app">
 <header><div class="brand">🌍 ことばの世界旅行</div><p class="tagline">ことばを世界へ旅させてみよう！</p></header>
-<section class="card"><label for="source">もとの日本語</label><textarea id="source" maxlength="3000" placeholder="ここに日本語を書いてね" rows="4"></textarea><div class="counter"><span id="count">0</span> / 3000</div>
+<section class="card"><label for="source">もとの日本語</label><textarea id="source" maxlength="500" placeholder="ここに日本語を書いてね" rows="4"></textarea><p class="privacy">なまえ・住所・電話番号など、大事な情報は入れないでね</p><div class="counter"><span id="count">0</span> / 500</div>
 <label for="level">逆翻訳レベル</label><select id="level"><option value="3">ちょい壊れ（3言語）</option><option value="5" selected>かなり壊れ（5言語）</option><option value="8">意味不明（8言語）</option><option value="12">カオス（12言語）</option></select>
 <button id="go" class="primary">逆翻訳する！</button><div id="status" class="status" aria-live="polite"></div></section>
 <section id="resultCard" class="card result-card" hidden><label>逆翻訳した日本語</label><div id="result" class="result">ここに戻ってきた言葉が出るよ</div><button id="again" class="secondary">もう一回</button><div class="route"><strong>今回の言葉の旅</strong><div id="route"></div></div><details><summary>途中も見る</summary><ol id="steps"></ol></details></section>
 <footer>翻訳にはインターネット接続が必要です。<span id="offline" hidden>インターネットにつながったら遊べるよ。</span></footer>
-</main><script src="app.js" defer></script></body></html>
+</main><script src="config.js"></script><script src="app.js" defer></script></body></html>
